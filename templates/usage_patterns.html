@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Patterns - Dublin Bikes</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+    <header class="bg-white shadow-md py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-blue-600">Dublin Bikes Analytics</h1>
+            <nav class="space-x-6">
+                <a href="/" class="hover:text-blue-600 transition text-gray-700">Home</a>
+                <a href="/real-time-data" class="hover:text-blue-600 transition text-gray-700">Real-time Data</a>
+                <a href="/usage-patterns" class="hover:text-blue-600 transition text-gray-700">Usage Patterns</a>
+                <a href="/system-statistics" class="hover:text-blue-600 transition text-gray-700">System Statistics</a>
+                <a href="/station-clusters" class="hover:text-blue-600 transition text-gray-700">Station Clusters</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-10">
+        <section class="bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-3xl font-bold text-blue-800 mb-6">Usage Patterns</h2>
+
+            <!-- Current Hour Performance -->
+            <div class="mb-8">
+                <h3 class="text-2xl font-bold text-gray-700">Current Hour Performance</h3>
+                <p>Live Bikes: <span id="liveBikes" class="font-bold text-blue-600">N/A</span></p>
+                <p>Historical Average: <span id="historicalAvg" class="font-bold text-blue-600">N/A</span></p>
+            </div>
+
+            <!-- Weekly Usage Chart -->
+            <div class="mb-8">
+                <h3 class="text-2xl font-bold text-gray-700">Weekly Trend Chart</h3>
+                <canvas id="weeklyChart" class="mt-4"></canvas>
+            </div>
+
+            <!-- Peak and Off-Peak Hours -->
+            <div class="grid md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-700">Peak Hours</h3>
+                    <ul id="peakHours" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-gray-700">Off-Peak Hours</h3>
+                    <ul id="offPeakHours" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+            </div>
+
+            <!-- Station Performance -->
+            <div class="grid md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-700">Busiest Stations</h3>
+                    <ul id="busiestStations" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-gray-700">Quietest Stations</h3>
+                    <ul id="quietestStations" class="list-disc pl-5 text-gray-600"></ul>
+                </div>
+            </div>
+
+            <!-- Demand Prediction -->
+            <div class="mb-8">
+                <h3 class="text-2xl font-bold text-gray-700">Demand Prediction</h3>
+                <p>Live Total Bikes: <span id="liveTotalBikes" class="font-bold text-blue-600">N/A</span></p>
+                <p>Historical Average: <span id="historicalTotalBikes" class="font-bold text-blue-600">N/A</span></p>
+                <p>Weekend vs Weekday Ratio: <span id="weekendRatio" class="font-bold text-blue-600">N/A</span></p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-white py-6">
+        <div class="container mx-auto text-center text-gray-600">
+            © 2024 Dublin Bikes Analytics. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        feather.replace();
+
+        // Fetch data for usage patterns
+        fetch('/api/usage-patterns')
+            .then(response => response.json())
+            .then(data => {
+                // Current Hour Performance
+                document.getElementById('liveBikes').textContent = data.current_hour.live_bikes;
+                document.getElementById('historicalAvg').textContent = data.current_hour.historical_avg;
+
+                // Weekly Trend Chart
+                const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+                new Chart(weeklyCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.daily_usage.map(item => item.day),
+                        datasets: [{
+                            label: 'Average Bikes Available',
+                            data: data.daily_usage.map(item => item.avg_usage),
+                            borderColor: '#3498db',
+                            borderWidth: 2,
+                            fill: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { title: { display: true, text: 'Days of the Week' } },
+                            y: { title: { display: true, text: 'Average Bikes' } }
+                        }
+                    }
+                });
+
+                // Peak and Off-Peak Hours
+                document.getElementById('peakHours').innerHTML = data.peak_hours.map(
+                    hour => `<li>${hour.hour}: ${hour.avg_bikes_available.toFixed(2)} bikes</li>`
+                ).join('');
+                document.getElementById('offPeakHours').innerHTML = data.off_peak_hours.map(
+                    hour => `<li>${hour.hour}: ${hour.avg_bikes_available.toFixed(2)} bikes</li>`
+                ).join('');
+
+                // Station Performance
+                document.getElementById('busiestStations').innerHTML = data.busiest_stations.map(
+                    station => `<li>${station.station_name}: ${station.bikes} bikes</li>`
+                ).join('');
+                document.getElementById('quietestStations').innerHTML = data.quietest_stations.map(
+                    station => `<li>${station.station_name}: ${station.bikes} bikes</li>`
+                ).join('');
+
+                // Demand Prediction
+                document.getElementById('liveTotalBikes').textContent = data.demand_prediction.live_total_bikes;
+                document.getElementById('historicalTotalBikes').textContent = data.demand_prediction.historical_total_bikes.toFixed(2);
+                document.getElementById('weekendRatio').textContent = data.demand_prediction.weekend_vs_weekday_ratio.toFixed(2);
+            })
+            .catch(error => console.error('Error fetching usage patterns:', error));
+    </script>
+</body>
+</html>

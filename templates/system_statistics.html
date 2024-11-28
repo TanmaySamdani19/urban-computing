@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Statistics - Dublin Bikes</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+    <header class="bg-white shadow-md py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-blue-600">Dublin Bikes Analytics</h1>
+            <nav class="space-x-6">
+                <a href="/" class="hover:text-blue-600 transition text-gray-700">Home</a>
+                <a href="/real-time-data" class="hover:text-blue-600 transition text-gray-700">Real-time Data</a>
+                <a href="/usage-patterns" class="hover:text-blue-600 transition text-gray-700">Usage Patterns</a>
+                <a href="/system-statistics" class="hover:text-blue-600 transition text-gray-700">System Statistics</a>
+                <a href="/station-clusters" class="hover:text-blue-600 transition text-gray-700">Station Clusters</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-10">
+        <section class="bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-3xl font-bold text-blue-800 mb-6">System Statistics</h2>
+            <div class="grid md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-blue-100 p-4 rounded-lg shadow-md text-center">
+                    <h3 class="text-blue-800 font-semibold text-xl">Total Bikes</h3>
+                    <p id="totalBikes" class="text-blue-600 font-bold text-2xl">-</p>
+                </div>
+                <div class="bg-green-100 p-4 rounded-lg shadow-md text-center">
+                    <h3 class="text-green-800 font-semibold text-xl">System Utilization</h3>
+                    <p id="systemUtilization" class="text-green-600 font-bold text-2xl">-</p>
+                </div>
+                <div class="bg-purple-100 p-4 rounded-lg shadow-md text-center">
+                    <h3 class="text-purple-800 font-semibold text-xl">Total Stations</h3>
+                    <p id="totalStations" class="text-purple-600 font-bold text-2xl">-</p>
+                </div>
+            </div>
+            <h3 class="text-2xl font-bold text-blue-800 mb-4">Station Metrics</h3>
+            <table class="w-full border-collapse border border-gray-200">
+                <thead class="bg-gray-800 text-white">
+                    <tr>
+                        <th class="p-2 border border-gray-200">Station Name</th>
+                        <th class="p-2 border border-gray-200">Bikes Available</th>
+                        <th class="p-2 border border-gray-200">Slots Available</th>
+                    </tr>
+                </thead>
+                <tbody id="stationMetrics"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer class="bg-white py-6">
+        <div class="container mx-auto text-center text-gray-600">
+            © 2024 Dublin Bikes Analytics. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        feather.replace();
+        fetch('/api/system-statistics')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalBikes').textContent = data.system_overview.total_bikes;
+                document.getElementById('systemUtilization').textContent = `${data.system_overview.system_utilization}%`;
+                document.getElementById('totalStations').textContent = data.system_overview.total_stations;
+
+                const metricsTable = document.getElementById('stationMetrics');
+                data.station_metrics.forEach(station => {
+                    metricsTable.innerHTML += `
+                        <tr>
+                            <td class="p-2 border border-gray-200">${station.name}</td>
+                            <td class="p-2 border border-gray-200">${station.bikes}</td>
+                            <td class="p-2 border border-gray-200">${station.slots}</td>
+                        </tr>`;
+                });
+            });
+    </script>
+</body>
+</html>

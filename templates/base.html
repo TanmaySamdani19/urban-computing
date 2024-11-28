@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dublin Bikes Analytics Dashboard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Dublin Bikes Analytics Dashboard</h1>
+            <p class="text-gray-600 mt-2">Real-time monitoring and analysis of Dublin's bike-sharing system</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Real-time Bike Availability -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Real-time Bike Availability</h2>
+                <div id="map" class="h-96 w-full rounded-lg"></div>
+            </div>
+
+            <!-- Usage Patterns -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Usage Patterns</h2>
+                <div class="space-y-4">
+                    <div class="h-64">
+                        <canvas id="usageChart"></canvas>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-2">Peak Hours</h3>
+                            <div id="peakHours" class="text-sm text-gray-600">
+                                <div class="animate-pulse">Loading...</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-2">Off-Peak Hours</h3>
+                            <div id="offPeakHours" class="text-sm text-gray-600">
+                                <div class="animate-pulse">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Station Clusters -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">Station Clusters</h2>
+                <div id="clusterMap" class="h-96 w-full rounded-lg"></div>
+            </div>
+
+            <!-- System Statistics -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-bold mb-4">System Statistics</h2>
+                <div id="stats" class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500">Total Bikes</h3>
+                        <p id="totalBikes" class="text-2xl font-bold text-gray-800">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500">System Utilization</h3>
+                        <p id="systemUtilization" class="text-2xl font-bold text-gray-800">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500">Active Stations</h3>
+                        <p id="activeStations" class="text-2xl font-bold text-gray-800">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500">Empty Stations</h3>
+                        <p id="emptyStations" class="text-2xl font-bold text-gray-800">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize maps
+        const map = L.map('map').setView([53.3498, -6.2603], 13);
+        const clusterMap = L.map('clusterMap').setView([53.3498, -6.2603], 13);
+
+        // Add tile layers
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(clusterMap);
+
+        // Initialize marker layers
+        let markers = L.layerGroup().addTo(map);
+        let clusterMarkers = L.layerGroup().addTo(clusterMap);
+
+        // Colors for clusters
+        const clusterColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+
+        // Function to update real-time map
+        function updateMap(data) {
+            markers.clearLayers();
+            data.forEach(station => {
+                const marker = L.marker([station.lat, station.lng])
+                    .bindPopup(`
+                        <b>${station.name}</b><br>
+                        Available Bikes: ${station.bikes}<br>
+                        Empty Slots: ${station.slots}
+                    `);
+                markers.addLayer(marker);
+            });
+        }
+
+        // Function to update cluster map
+        function updateClusterMap(data) {
+            clusterMarkers.clearLayers();
+            data.forEach(station => {
+                const marker = L.circleMarker([station.lat, station.lng], {
+                    radius: 8,
+                    fillColor: clusterColors[station.cluster],
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).bindPopup(`
+                    <b>${station.name}</b><br>
+                    Cluster: ${station.cluster + 1}<br>
+                    Available Bikes: ${station.bikes}<br>
+                    Empty Slots: ${station.slots}
+                `);
+                clusterMarkers.addLayer(marker);
+            });
+        }
+
+        // Function to create usage chart
+        function createUsageChart(data) {
+            const ctx = document.getElementById('usageChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(item => item.hour),
+                    datasets: [{
+                        label: 'Average Available Bikes',
+                        data: data.map(item => item.usage),
+                        borderColor: '#4C51BF',
+                        backgroundColor: 'rgba(76, 81, 191, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Average Available Bikes'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Hour of Day'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function to update system statistics
+        function updateSystemStats(data) {
+            document.getElementById('totalBikes').textContent = data.system_overview.total_bikes;
+            document.getElementById('systemUtilization').textContent = `${data.system_overview.system_utilization}%`;
+            document.getElementById('activeStations').textContent = data.system_overview.active_stations;
+            document.getElementById('emptyStations').textContent = data.system_overview.empty_stations;
+        }
+
+        // Fetch and display data
+        function fetchData() {
+            // Fetch real-time data
+            fetch('/api/real-time-data')
+                .then(response => response.json())
+                .then(data => updateMap(data));
+
+            // Fetch usage patterns
+            fetch('/api/usage-patterns')
+                .then(response => response.json())
+                .then(data => {
+                    // Update peak hours
+                    const peakHoursEl = document.getElementById('peakHours');
+                    let peakHtml = '<ul class="list-none space-y-2">';
+                    data.peak_hours.forEach(hour => {
+                        peakHtml += `<li>🚲 ${hour.hour} (${hour.avg_bikes_available.toFixed(1)} bikes avg.)</li>`;
+                    });
+                    peakHtml += '</ul>';
+                    peakHoursEl.innerHTML = peakHtml;
+
+                    // Update off-peak hours
+                    const offPeakHoursEl = document.getElementById('offPeakHours');
+                    let offPeakHtml = '<ul class="list-none space-y-2">';
+                    data.off_peak_hours.forEach(hour => {
+                        offPeakHtml += `<li>🚲 ${hour.hour} (${hour.avg_bikes_available.toFixed(1)} bikes avg.)</li>`;
+                    });
+                    offPeakHtml += '</ul>';
+                    offPeakHoursEl.innerHTML = offPeakHtml;
+
+                    // Create usage chart
+                    createUsageChart(data.hourly_data);
+                });
+
+            // Fetch cluster data
+            fetch('/api/clusters')
+                .then(response => response.json())
+                .then(data => updateClusterMap(data));
+
+            // Fetch system statistics
+            fetch('/api/system-statistics')
+                .then(response => response.json())
+                .then(data => updateSystemStats(data));
+        }
+
+        // Initial data fetch
+        fetchData();
+
+        // Refresh data every 5 minutes
+        setInterval(fetchData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
